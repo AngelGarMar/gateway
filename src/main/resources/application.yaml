@@ -1,0 +1,77 @@
+spring:
+  application:
+    name: gateway
+  threads:
+    virtual:
+      enabled: true
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: clientes
+              uri: lb://CLIENTES
+              predicates:
+                - name: Path
+                  args:
+                    patterns:
+                      - /api/v1/clientes/**
+              filters:
+                - StripPrefix=2
+            - id: conductores
+              uri: lb://CONDUCTORES
+              predicates:
+                - name: Path
+                  args:
+                    patterns:
+                      - /api/v1/drivers/**
+                      - /api/v1/data/**
+                      - /api/v1/vehicles/**
+              filters:
+                - StripPrefix=2
+            - id: pagos
+              uri: lb://PAGOS
+              predicates:
+                - name: Path
+                  args:
+                    patterns:
+                      - /api/v1/pagos/**
+              filters:
+                - StripPrefix=2
+            - id: paraderos
+              uri: lb://PARADEROS
+              predicates:
+                - name: Path
+                  args:
+                    patterns:
+                      - /api/v1/paraderos/**
+              filters:
+                - StripPrefix=2
+            - id: usuarios
+              uri: lb://USUARIOS
+              predicates:
+                - name: Path
+                  args:
+                    patterns:
+                      - /api/v1/users/**
+                      - /api/v1/roles/**
+              filters:
+                - StripPrefix=2
+            - id: viajes
+              uri: lb://VIAJES
+              predicates:
+                - name: Path
+                  args:
+                    patterns:
+                      - /api/v1/viajes/**
+              filters:
+                - StripPrefix=2
+server:
+  port: 9000
+#Eureka
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    fetch-registry: true
+    register-with-eureka: true
