@@ -17,6 +17,10 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
+
 @Component
 public class AuthenticationFilter extends AbstractGatewayFilterFactory<AuthenticationFilter.Config> {
     private static final Logger log = LoggerFactory.getLogger(AuthenticationFilter.class);
@@ -73,26 +77,24 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
 
             log.info("se valida el rol requerido desde el yml");
             Claims claims = jwtUtil.getClaims(token);
-            String rolRequerido = config.getRequiredRole();
-            if (rolRequerido != null && !rolRequerido.isEmpty()) {
-                log.info("se valida el rol permitido");
-                //se extrae el rol que se guardó en el jwt
-                String rolesUsuario = claims.get("authorities", String.class);
-                log.info("ruta: {} exige el rol: {}. El usuario tiene los roles: {}", path, rolRequerido, rolesUsuario);
-                if (rolesUsuario != null) {
-                    rolesUsuario = rolesUsuario.replace("[", "").replace("]", "").replace("\"", "").trim();
-                }
-                if (rolesUsuario == null || !rolesUsuario.contains("ROLE_ADMIN")) {
-                    log.info("usuario no autorizado para entrar a {}. No tiene el rol {}", path, rolRequerido);
-                    //se devuelve 403 forbidden cuando el token es válido pero no tiene permisos
-                    Response response = new Response(HttpStatus.FORBIDDEN.value(), "No tienes permisos para acceder a este recurso", HttpStatus.FORBIDDEN.getReasonPhrase(), "");
-                    return onError(exchange, response, HttpStatus.FORBIDDEN);
-                }
+            List<String> rolesToken = Arrays.stream(claims.get("authorities", String.class).replace("[", "").replace("]", "").replace("\"", "").split(","))
+                    .map(String::trim).toList();
+            log.info("roles del token: {}", rolesToken);
+            List<String> rolesPermitidos = Arrays.stream(config.getRequiredRole().split(","))
+                    .map(String::trim).toList();
+            log.info("roles permitidos: {}", rolesPermitidos);
+            log.info("se verifica si el usuario tiene al menos uno de los roles permitidos");
+            boolean tienePermiso = rolesToken.stream().anyMatch(rolesPermitidos::contains);
+            if (!tienePermiso) {
+                log.info("usuario no autorizado para entrar a {}, requiere uno de: {}", path, rolesPermitidos);
+                //se devuelve 403 forbidden cuando el token es válido pero no tiene permisos
+                Response response = new Response(HttpStatus.FORBIDDEN.value(), "No tienes permisos para acceder a este recurso", HttpStatus.FORBIDDEN.getReasonPhrase(), "");
+                return onError(exchange, response, HttpStatus.FORBIDDEN);
             }
 
-            log.info("se propaga información hacia el microservicio");
+            log.info("se propaga información de user y roles hacia el microservicio");
             log.info("user: {}", claims.getSubject());
-            log.info("roles: {}", claims.get("authorities", String.class));
+            log.info("roles: {}", rolesToken);
             ServerHttpRequest modifiedRequest = request.mutate()
                     .headers(header -> {
                         header.remove("X-User-Id");
